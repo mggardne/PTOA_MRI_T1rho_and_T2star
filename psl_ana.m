@@ -233,6 +233,8 @@ for kb = 1:2            % 1 - Femur and 2 - Tibia
 %
             ikl = 2-kl; % 0 - deep, 1 -superficial
 %
+            id(idx,:) = [ikb ikc ikr ikl];  % Compartment, bone, ROI, and layer IDs
+%
             idx = 12*kb+6*kc+2*kr+kl-20;    % Index to variables
             nps{idx} = squeeze(np(kb,kc,kr,kl,:));    % Number of pixels in slice
 %
@@ -282,7 +284,6 @@ for kb = 1:2            % 1 - Femur and 2 - Tibia
             tc(idx) = rp(2);           % Time constant - T1rho/T2* 
             amp(idx) = rp(1);          % Amplitude of exponential
             rss(idx) = err;            % Residual sum of squares
-            id(idx,:) = [ikb ikc ikr ikl];  % Compartment, bone, ROI, and layer IDs
 %
 % Calculate T1rho/T2* for Each Pixel in Each Layer
 %
