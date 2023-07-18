@@ -33,7 +33,7 @@
 %             and in ascending order.  The last duplicate echo times
 %             are used for registration and saved in the resulting MAT
 %             file.
-
+%
 %     19-Jul-2022 * Mack Gardner-Morse
 %
 
