@@ -122,11 +122,22 @@ end
 %
 [xyi,id1] = lsect2a(mp(1),bp(1),xy2);
 ni = size(id1,1);
+%
+if ni==0                % No intersection found - try 90 degrees
+  mp = -de(:,1)./de(:,2);              % 90 degrees
+  ids = abs(de(:,2))<1e-8;
+  mp(ids) = sign(mp(ids))*1e+4;        % Large but not infinite slope
+  bp = yp-mp.*xp;
+  [xyi,id1] = lsect2a(mp(1),bp(1),xy2);
+  ni = size(id1,1);
+end
+%
 if ni>1
   idp = near2([xp(1) yp(1)],xyi);      % Get nearest point
   id1 = id1(idp);
   xyi = xyi(idp,:);
 end
+%
 d = xyi-xy1(1,:);
 d = d*d';
 if d>diste              % Bone line within 2 DIST of cartilage end points
@@ -139,6 +150,16 @@ end
 %
 [xyi,id2] = lsect2a(mp(2),bp(2),xy2);
 ni = size(id2,1);
+%
+if ni==0                % No intersection found - try 90 degrees
+  mp = -de(:,1)./de(:,2);              % 90 degrees
+  ids = abs(de(:,2))<1e-8;
+  mp(ids) = sign(mp(ids))*1e+4;        % Large but not infinite slope
+  bp = yp-mp.*xp;
+  [xyi,id2] = lsect2a(mp(2),bp(2),xy2);
+  ni = size(id2,1);
+end
+%
 if ni>1
   idp = near2([xp(2) yp(2)],xyi);      % Get nearest point
   id2 = id2(idp);

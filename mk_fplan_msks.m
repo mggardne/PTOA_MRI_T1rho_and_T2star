@@ -55,8 +55,8 @@ function maskfr = mk_fplan_msks(f3f,f,rslf,nslf,plan_pts,plan_nvs, ...
 %
 %                  4.  The M-files cr_maskf.m, cr_maskfc.m, decomp.m,
 %                  in_tri2d.m, lsect2.m, lsect2a.m, mk2_tri_2df.m,
-%                  mk2_tri_2dfc.m, mtch_ends.m, near2.m, and rb_trnsf.m
-%                  must be in the current directory or path.
+%                  mk2_tri_2dfc.m, mtch_ends.m, near2.m, plsect2.m, and
+%                  rb_trnsf.m must be in the current directory or path.
 %
 %          09-Jan-2022 * Mack Gardner-Morse 
 %
@@ -381,7 +381,14 @@ for k = 1:nslf
              idxb = idsb==p;
              pdat = {fr{1,idxc}; fr{2,idxb}};
              clp = clip(idxb,:);
-             maskfr(:,l,p,k) = cr_maskfc(pdat,iszs,clp,dist);   % Create mask
+             try
+                maskfr(:,l,p,k) = cr_maskfc(pdat,iszs,clp,dist);     % Create mask
+             catch
+                warning([' *** Warning in MK_FPLAN_MSKS:  Femur', ...
+                   ' cartilage and bone do not form an ROI', ...
+                   ' on slice ' int2str(ksl) '!']);
+%                keyboard
+             end
 %
 % Plot 3D Regions of Interest (ROIs) for this Plane and this Slice
 %

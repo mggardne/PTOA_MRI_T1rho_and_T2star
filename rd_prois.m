@@ -9,16 +9,23 @@ function bones = rd_prois(fnam)
 %          the tiba.  BONES.rois(1) is the cartilage and BONES.rios(2)
 %          is the bone.  BONES.rois.roi(1) is the lateral compartment and
 %          and BONES.rois.roi(2) is the medial compartment.  For the
-%          femur, BONES(1).rois.roi(3) is the femoral trochlea.
+%          femur, BONES(1).rois.roi(3) is the femoral trochlea if there
+%          are trochlea segmentations.
 %
 %          BONES = RD_PROIS(FNAM) given the CSV segmentation file name,
 %          PNAM, return structure BONES with the femur and tibia
 %          segmented regions of interest (ROIs).
 %
-%          NOTES:  1.  M-file rd_roi6.m must be in the current directory
-%                  or path.
+%          NOTES:  1.  M-file rd_roi6hp.m must be in the current
+%                  directory or path.
 %
 %          15-Sep-2022 * Mack Gardner-Morse 
+%
+%          02-Jul-2024 * Mack Gardner-Morse * Updated function rd_roi6.m
+%                                             with rd_roi6hp.m.
+%
+%          08-Aug-2025 * Mack Gardner-Morse * Traps for segmentations
+%                                             without trochlea.
 %
 
 %#######################################################################
@@ -32,8 +39,8 @@ end
 %
 % Read Segmentations
 %
-dat = rd_roi6(fnam,true);
-dat3 = rd_roi6(fnam,false);
+dat = rd_roi6hp(fnam,true);
+dat3 = rd_roi6hp(fnam,false);
 %
 nams = {dat.name}';
 data = {dat.data}';     % 2-D pixels
@@ -100,10 +107,12 @@ bones(2).rois = rois;
 %
 % Put Femur ROIs into Structures
 %
-roi(3).data = data{idft&idfb}';        % Trochlea bone
-roi(3).data3 = data3{idft&idfb}';
-roi(3).imageno = imageno{idft&idfb};
-roi(3).name = nams{idft&idfb};
+if any(idft)
+  roi(3).data = data{idft&idfb}';      % Trochlea bone
+  roi(3).data3 = data3{idft&idfb}';
+  roi(3).imageno = imageno{idft&idfb};
+  roi(3).name = nams{idft&idfb};
+end
 %
 roi(2).data = data{idfm&idfb}';        % Medial compartment bone
 roi(2).data3 = data3{idfm&idfb}';
@@ -119,10 +128,12 @@ rois(2).name = 'Bone';
 rois(2).roi = roi;
 rois(2).slice = [imageno{(idfl|idfm|idft)&idfb}]';
 %
-roi(3).data = data{idft&idfc}';        % Trochlea cartilage
-roi(3).data3 = data3{idft&idfc}';
-roi(3).imageno = imageno{idft&idfc};
-roi(3).name = nams{idft&idfc};
+if any(idft)
+  roi(3).data = data{idft&idfc}';      % Trochlea cartilage
+  roi(3).data3 = data3{idft&idfc}';
+  roi(3).imageno = imageno{idft&idfc};
+  roi(3).name = nams{idft&idfc};
+end
 %
 roi(2).data = data{idfm&idfc}';        % Medial compartment cartilage
 roi(2).data3 = data3{idfm&idfc}';

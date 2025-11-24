@@ -63,7 +63,10 @@ function [maskf,maskt,ibone,f,t,f3,t3] = mk_lay_msks(brois,rsl,nrsl, ...
 %                  and near2.m must be in the current directory or
 %                  path.
 %
-%          09-Dec-2022 * Mack Gardner-Morse 
+%          09-Dec-2022 * Mack Gardner-Morse
+%
+%          08-Aug-2025 * Mack Gardner-Morse * Checks for trochlea in
+%                                             input BROIS variable.
 %
 
 %#######################################################################
@@ -129,7 +132,11 @@ end
 %
 % Initialize Arrays
 %
-itroch = true;          % Include trochlear segmentations
+if size(brois(1).rois(1).roi,2)<3
+  itroch = false;       % No trochlear segmentations
+else
+  itroch = true;        % Include trochlear segmentations
+end
 %
 f = cell(2,nrsl);       % 2D Femur coordinates (1 - cartilage, 2 - bone)
 t = cell(2,nrsl);       % 2D Tibia coordinates (1 - cartilage, 2 - bone)
@@ -200,7 +207,9 @@ for k = 1:nrsl          % Loop through all slices
                 end
 %
                 if iplt
-                  lh(idxl) = plot(dat(:,1),dat(:,2),lt(idxl,:));
+%                  lh(idxl) = plot(dat(:,1),dat(:,2),lt(idxl,:));
+                  lh(idxl) = plot(dat(:,1),dat(:,2),lt(idxl,:), ...
+                                  'LineWidth',0.25,'MarkerSize',2);
                   idl(idxl) = true;
                 end
 %
