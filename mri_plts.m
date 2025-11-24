@@ -1,13 +1,10 @@
 %#######################################################################
 %
-%                    * MRI FIT PTOA Slice Program *
+%                      * MRI PLoT Slice Program *
 %
-%          M-File which reads the registered MRI data and segmentation 
-%     MAT files and fits a monoexponential to the MRI data as a function
-%     of spin lock or echo times where T1rho or T2* are the time
-%     constants of the fits.  Resulting T1rho and T2* values and summary
-%     statistics are written to the MS-Excel spreadsheet,
-%     mri_fitps2.xlsx, in the "Results\mri_fitps2" directory.
+%          M-File which reads the segmentation MAT files and results
+%     MAT file to plot the T2* results overlaid on the MRI data for
+%     particular slices.  The results are saved as PNG image files.
 %
 %     NOTES:  1.  Data MAT files must be in subject directories starting
 %             with "0".
@@ -17,10 +14,13 @@
 %             names must contain "prois".  See rd_m_dicom.m and
 %             seg_prois.m.
 %
-%             3.  M-file exp_fun1.m, psl_ana.m and psl_plt.m must be in
-%             the current directory or path.
+%             3.  M-file psl_plts.m must be in the current directory or
+%             path.
 %
-%     23-Mar-2022 * Mack Gardner-Morse
+%             4.  Only for T2* plots.  Currently setup to get T2* plots
+%             for female lateral compartment slices for T1rho/T2* paper.
+%
+%     27-Sep-2023 * Mack Gardner-Morse
 %
 
 %#######################################################################
@@ -31,55 +31,53 @@ gmap = gray(128);       % Gray color map for not cartilage
 jmap = jet(128);        % Jet color map for cartilage
 cmap = [gmap; jmap];
 %
-% Set Curvefit Optimization Parameters
-%
-opt = optimset('Display','off','TolFun',1e-8,'TolX',1e-8,'MaxIter', ...
-               2e+3,'Algorithm','levenberg-marquardt','Jacobian', ...
-               'on','UseParallel',true);
-%
-fun = @exp_fun1;        % Exponential function
-%
 % Initialize Parameters
-%
-% init = -1;              % Use weighted least squares for starting parameters
-% init = 0;               % Use linear least squares for starting parameters
-init = 1;               % Use fixed starting parameters
-tr0 = 65;               % Initial T1rho estimate in ms
-% tr0 = 80;               % Initial T1rho estimate in ms
-trmx = 100;             % Maximum valid T1rho result
-trmn = 0;               % Minimum valid T1rho result
-ts0 = 35;               % Initial T2* estimate in ms
-tsmx = 100;             % Maximum valid T2* result
-tsmn = 0;               % Minimum valid T2* result
 %
 mxtr = 80;              % Maximum scale on T1rho plots
 mxts = 75;              % Maximum scale on T2* plots
 %
 % Output Directory, Output Files and Output Labels
 %
-resdir = fullfile('Results','mri_fitps2');       % Results directory
+resdir = fullfile('Results','mri_fitps');        % Results directory
 %
-ifirst = true;          % First write to file
-xlsnam = 'mri_fitps2.xlsx';            % Results spreadsheet
-xlsnam = fullfile(resdir,xlsnam);      % Include output directory
-hdrs1 = {'Subject' 'Result' 'Leg' 'Bone' 'Comprt' 'ROI' 'Layer'};
-hdrs2 = {'Pixels' 'T1R/T2S' 'RSS' 'ValidPix' 'Mean' 'Min' 'Max' ...
-         'SD' 'COV'};
+pngnam = fullfile(resdir,'mri_fitps_');     % Start of PNG file name
+% pngtyp = '.png';        % PNG file type
 %
-psnam = fullfile(resdir,'mri_fitps2_');     % Start of PS file name
-pstyp = '.ps';          % PS file type
+% Get T2* Results
+%
+% Indices key:
+%   Index 1 - Subject
+%   Index 2 - Leg - 1 = left and 2 = right
+%   Index 3 - Bone - 1 = femur and 2 = tibia
+%   Index 4 - Compartment - 1 = lateral and 2 = medial
+%   Index 5 - ROI - 1 = anterior/trochlea, 2 = central and 3 = posterior
+%   Index 6 - Layer - 1 = deep and 2 = superficial
+%
+% Note:  Layers for masks and compartment analysis variables are:
+%        1 = superficial and 2 = deep.
+%
+load(fullfile(resdir,'mri_fitps.mat'),'t2s_res','t2s_npx', ...
+     't2s_rss','t2s_respx','t2s_rsspx','t2s_nps');
 %
 % Get Subject Directories
 %
 sdirs = dir('0*');
 sdirs = {sdirs([sdirs.isdir]').name}'; % Subject directories
 %
-nn = [1:5 8:22]';       % Get valid subjects
-sdirs = sdirs(nn);
+% Get Index to First 20 Subjects without Subject 019
 %
+id19 = ~contains(sdirs,'019');
+sdirs = sdirs(id19);
+%
+% Subjects for Plots
+%
+idsubj = contains(sdirs,pattern({'018';'031';'051'}));     % Subjects 18, 31, and 51
+sdirs = sdirs(idsubj);
 nsubj = size(sdirs,1);
 %
-% Initialize Results Variables
+idsubj = find(idsubj);
+%
+% Results Variables
 %
 % Indices key:
 %   Index 1 - Subject
@@ -89,27 +87,14 @@ nsubj = size(sdirs,1);
 %   Index 5 - ROI - 1 = anterior/trochlea, 2 = central and 3 - posterior
 %   Index 6 - Layer - 1 = deep and 2 = superficial
 %
-t1r_res = zeros(nsubj,2,2,2,3,2);
-t1r_npx = zeros(nsubj,2,2,2,3,2);
-t1r_rss = zeros(nsubj,2,2,2,3,2);
-%
-t1r_respx = cell(nsubj,2,2,2,3,2);
-t1r_rsspx = cell(nsubj,2,2,2,3,2);
-t1r_nps = cell(nsubj,2,2,2,3,2);
-%
-t2s_res = zeros(nsubj,2,2,2,3,2);
-t2s_npx = zeros(nsubj,2,2,2,3,2);
-t2s_rss = zeros(nsubj,2,2,2,3,2);
-%
-t2s_respx = cell(nsubj,2,2,2,3,2);
-t2s_rsspx = cell(nsubj,2,2,2,3,2);
-t2s_nps = cell(nsubj,2,2,2,3,2);
+sls = [16 33];          % Left and right leg lateral compartment slices
 %
 % Loop through Subjects
 %
 for ks = 1:nsubj
 % for ks = nsubj:nsubj
 % for ks = 1:5
+   kss = idsubj(ks);    % Index to subject results
 %
 % Get Subject Directory (Name) and Number
 %
@@ -117,12 +102,12 @@ for ks = 1:nsubj
    subj = eval(sdir);   % Subject number
    subjtxt = ['Subject ' sdir];
 %
-   psnams = [psnam sdir];           % Add subject to PS file name
+   pngnams = [pngnam sdir];            % Add subject to PNG file name
 %
 % Get T1rho MAT Files in Directory
 %
-%    ido = false;         % Skip T1rho
-   ido = true;          % Do T1rho
+   ido = false;         % Skip T1rho
+%    ido = true;          % Do T1rho
 %
    if ido
 %
@@ -150,7 +135,7 @@ for ks = 1:nsubj
      restxt = [subjtxt ' T1\rho'];
      idt = 1;           % Spin lock/echo time for plots - 1 = 0 ms spin lock time
 %
-     psnamr = [psnams '_T1R_'];        % Add result type to PS file name
+     psnamr = [pngnams '_T1R_'];       % Add result type to PS file name
 %
 % Loop through T1rho MAT Files
 %
@@ -239,11 +224,11 @@ for ks = 1:nsubj
 %
 % Do Slice Analysis
 %
-        [tc,~,rss,npx,id,tcp,~,rssp,nps] = psl_ana(v,masklay, ...
-                     maskroi,rsl,nrsl,rslbs,splt,nslt,fun,init,tr0,opt);
-        na = size(tc,1);               % Number of results
+%         [tc,~,rss,npx,id,tcp,~,rssp,nps] = psl_ana(v,masklay, ...
+%                      maskroi,rsl,nrsl,rslbs,splt,nslt,fun,init,tr0,opt);
+%         na = size(tc,1);               % Number of results
 %
-% Save Results
+% Get Results
 %
 % Indices key:
 %   Index 1 - Subject
@@ -274,8 +259,8 @@ for ks = 1:nsubj
 % Plot Results
 %
         sid = [restxt legtxt];    % Subject, result (T1rho/T2*), and leg
-        psl_plt(v,masklay,maskroi,rsl,nrsl,rslbs,idt,tcp,nps,mxtr, ...
-                cmap,sid,psnamf);
+%         psl_plt(v,masklay,maskroi,rsl,nrsl,rslbs,idt,tcp,nps,mxtr, ...
+%                 cmap,sid,psnamf);
 %
 % Get Statistics on Pixel Results
 %
@@ -349,11 +334,10 @@ for ks = 1:nsubj
 %
 % T2* Identifier
 %
-   ires = 1;            % ires = 0 - T1rho, ires = 1 - T2*
    restxt = [subjtxt ' T2*'];
    idt = 3;             % Spin lock/echo time for plots - 3 = 5 ms echo time
 %
-   psnamr = [psnams '_T2S_'];          % Add result type to PS file name
+   pngnamr = [pngnams '_T2S_'];        % Add result type to PNG file name
 %
 % Loop through T2* MAT Files
 %
@@ -362,9 +346,7 @@ for ks = 1:nsubj
 % Load Data
 %
       starnam = starnams{km};
-      load(fullfile(sdir,starnam),'etns','iszs','netn','scmx', ...
-           'sns','snt','st','v');
-      npix = prod(iszs);     % Number of pixels in an image
+      load(fullfile(sdir,starnam),'scmx','sns','snt','st','v');
       fs = ['S' snt];        % Series number prefaced with a 'S'
 %
       idm = contains(roinams,starnam(1:end-4));    % Get matching file
@@ -384,9 +366,9 @@ for ks = 1:nsubj
         ileg = 1;       % Coding for leg
       end
 %
-% Add Leg to PS File Name
+% Add Leg to PNG File Name
 %
-      psnamf = [psnamr leg pstyp];     % Add leg to PS file name
+      pngnamf = [pngnamr leg];         % Add leg to PNG file name
 %
 % Get Femur ROI Masks
 %
@@ -440,13 +422,7 @@ for ks = 1:nsubj
 %
       rslbs = {rslf; rslt};            % Combine femur and tibia slices
 %
-% Do Slice Analysis
-%
-      [tc,~,rss,npx,id,tcp,~,rssp,nps] = psl_ana(v,masklay, ...
-                     maskroi,rsl,nrsl,rslbs,etns,netn,fun,init,ts0,opt);
-      na = size(tc,1);                 % Number of results
-%
-% Save Results
+% Get Results
 %
 % Indices key:
 %   Index 1 - Subject
@@ -459,73 +435,19 @@ for ks = 1:nsubj
 % Note:  Layers for masks and compartment analysis variables are:
 %        1 = superficial and 2 = deep.
 %
-      for ka = 1:na
-         t2s_res(ks,ileg+1,id(ka,1)+1,id(ka,2)+1,id(ka,3)+1, ...
-                 id(ka,4)+1) = tc(ka);
-         t2s_npx(ks,ileg+1,id(ka,1)+1,id(ka,2)+1,id(ka,3)+1, ...
-                 id(ka,4)+1) = npx(ka);
-         t2s_rss(ks,ileg+1,id(ka,1)+1,id(ka,2)+1,id(ka,3)+1, ...
-                 id(ka,4)+1) = rss(ka);
-         t2s_respx{ks,ileg+1,id(ka,1)+1,id(ka,2)+1,id(ka,3)+1, ...
-                   id(ka,4)+1} = tcp{ka};
-         t2s_rsspx{ks,ileg+1,id(ka,1)+1,id(ka,2)+1,id(ka,3)+1, ...
-                   id(ka,4)+1} = rssp{ka};
-         t2s_nps{ks,ileg+1,id(ka,1)+1,id(ka,2)+1,id(ka,3)+1, ...
-                   id(ka,4)+1} = nps{ka};
-      end
+      tcp = squeeze(t2s_respx(kss,ileg+1,:,:,:,[2;1]));
+      nps = squeeze(t2s_nps(kss,ileg+1,:,:,:,[2;1]));
 %
 % Plot Results
 %
-      sid = [restxt legtxt];      % Subject, result (T1rho/T2*), and leg
-      psl_plt(v,masklay,maskroi,rsl,nrsl,rslbs,idt,tcp,nps,mxts, ...
-              cmap,sid,psnamf);
-%
-% Get Statistics on Pixel Results
-%
-      npxv = zeros(na,1);              % Number of valid results
-      tcpm = zeros(na,1);              % Mean
-      tcpmn = zeros(na,1);             % Minimum
-      tcpmx = zeros(na,1);             % Maximum
-      tcpsd = zeros(na,1);             % SD
-%
-      for ka = 1:na
-         idv = tcp{ka}>=tsmn&tcp{ka}<=tsmx;
-         npxv(ka) = sum(idv);          % Number of valid results
-         tcpv = tcp{ka}(idv);          % Valid T2* values
-         tcpm(ka) = mean(tcpv);        % Mean
-         tcpmn(ka) = min(tcpv);        % Minimum
-         tcpmx(ka) = max(tcpv);        % Maximum
-         tcpsd(ka) = std(tcpv);        % SD
-      end
-%
-      tcpcov = 100*tcpsd./tcpm;        % Coefficient of variation
-%
-% Combine Identifiers
-%
-      ids = [subj ires ileg];          % MAT file identifiers
-      ids = repmat(ids,na,1);
-      ids = [ids id];                  % All identifiers
-%
-% Create and Write Table of Results
-%
-      t1 = array2table(ids,'VariableNames',hdrs1);
-      t2 = table(npx,tc,rss,npxv,tcpm,tcpmn,tcpmx,tcpsd,tcpcov, ...
-                 'VariableNames',hdrs2);
-      t = [t1 t2];
-%
-      writetable(t,xlsnam,'WriteMode','append', ...
-                 'WriteVariableNames',false);
+%       sid = [restxt legtxt];      % Subject, result (T1rho/T2*), and leg
+      psl_plts(v,masklay,maskroi,rsl,nrsl,rslbs,idt,tcp,nps,mxts, ...
+              cmap,sls(ileg+1),pngnamf);
 %
    end                  % End of km loop - T2* MAT file loop
 %
    close all;           % Close all plot windows
 %
 end                     % End of ks loop - subjects loop
-%
-% Save to MAT File
-%
-save(fullfile(resdir,'mri_fitps2.mat'),'t1r_res','t1r_npx', ...
-     't1r_rss','t1r_respx','t1r_rsspx','t1r_nps','t2s_res', ...
-     't2s_npx','t2s_rss','t2s_respx','t2s_rsspx','t2s_nps');
 %
 return
