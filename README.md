@@ -30,8 +30,8 @@ The ROIs are based on the lateral and medial compartments of the femur and tibia
 23. tibia medial posterior deep ROI,
 24. tibia medial posterior superficial ROI,
 
-Please see PTOA_ImageAnalysisPipeline.pdf for a flowchart for the sequence of execution of Matlab M-files.
+Please see PTOA_ImageAnalysisPipeline2.pdf for a flowchart for the sequence of execution of Matlab M-files.
 
 Please see the header comments in the M-files.  Dependent functions are listed in the comments.  There are a few helper M-files and a few unused M-files that are not required for the T1rho and T2* analyzes.
 
-Note that the data must be in particular directories.
+Note that the data must be in subject directories under visit subdirectories (BASELINE, YEAR1, or YEAR2).
