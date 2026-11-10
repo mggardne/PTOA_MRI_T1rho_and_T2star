@@ -7,7 +7,7 @@
 %     of spin lock or echo times where T1rho or T2* are the time
 %     constants of the fits.  Resulting T1rho and T2* values and summary
 %     statistics are written to the MS-Excel spreadsheet,
-%     mri_fitpsvy1r2.xlsx, in the "Results\mri_fitpsvy1r2" directory.
+%     mri_fitpsvy1r3.xlsx, in the "Results\mri_fitpsvy1r3" directory.
 %
 %     NOTES:  1.  Data MAT files must be in subject directories starting
 %             with "0".
@@ -59,17 +59,17 @@ mxts = 65;              % Maximum scale on T2* plots
 %
 % Output Directory, Output Files and Output Labels
 %
-resdir = fullfile('Results','mri_fitpsvy1r2');   % Results directory
+resdir = fullfile('Results','mri_fitpsvy1r3');   % Results directory
 %
 ifirst = true;          % First write to file
 % ifirst = false;         % First write to file
-xlsnam = 'mri_fitpsvy1r2.xlsx';        % Results spreadsheet
+xlsnam = 'mri_fitpsvy1r3.xlsx';        % Results spreadsheet
 xlsnam = fullfile(resdir,xlsnam);      % Include output directory
 hdrs = {'Subject' 'Visit' 'Result' 'Leg' 'Bone' 'Comprt' 'ROI' 'Layer'};
 hdrs2 = {'Pixels' 'T1R/T2S' 'RSS' 'ValidPix' 'Mean' 'Min' 'Max' ...
          'SD' 'COV'};
 %
-psnam = fullfile(resdir,'mri_fitpsvy1r2_');      % Start of PS file name
+psnam = fullfile(resdir,'mri_fitpsvy1r3_');      % Start of PS file name
 pstyp = '.ps';          % PS file type
 %
 % Get Subject and Visit Directories
@@ -167,6 +167,9 @@ idy1 = logical([ 0
                  0
                  0 ]);
 sdirs = sdirs(idy1);
+%
+% sdirs = sdirs([2 4 7 12]);             % Subjects 006, 008, 014, and 021
+%
 nsubj = size(sdirs,1);
 % subjn = [(5:8)';15;17;20;21;23;27];
 % nsubj = size(subjn,1);
@@ -208,7 +211,7 @@ t2s_nps = cell(nsubj,3,2,2,2,3,2);
 % If NOT First Run, Load Previous Results
 %
 if ~ifirst
-  load(fullfile(resdir,'mri_fitpsvy1r2.mat'));
+  load(fullfile(resdir,'mri_fitpsvy1r3.mat'));
 end
 %
 % Loop through Subjects
@@ -705,7 +708,7 @@ end                     % End of ks loop - subjects loop
 %
 % Save to MAT File
 %
-save(fullfile(resdir,'mri_fitpsvy1r2.mat'),'t1r_res','t1r_npx', ...
+save(fullfile(resdir,'mri_fitpsvy1r3.mat'),'t1r_res','t1r_npx', ...
      't1r_rss','t1r_respx','t1r_rsspx','t1r_nps','t2s_res', ...
      't2s_npx','t2s_rss','t2s_respx','t2s_rsspx','t2s_nps');
 %

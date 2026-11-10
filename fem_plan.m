@@ -157,17 +157,25 @@ idp = find(my(ids)>0);
 idp = ids(idp(end-2:end));             % Lateral peak index to top three
 idn = find(my(ids)<0);
 idn = ids(idn(end-2:end));             % Medial peak index to top three
+% [~,id1] = min(my(idn));                % Most medial peak - PTOA subject 014 year 1 visit left knee T2*
+% [~,id1] = max(my(idn));                % Least medial peak - PTOA subject 014 year 1 visit left knee T1rho
+% idn = idn(id1)-2:idn(id1);             % Next most medial peaks - PTOA subject 014 year 1 visit left knee T1rho/T2*
 mxp = mean(mx(idp));                   % Lateral peak X
 myp = mean(my(idp));                   % Lateral peak Y
 mxn = mean(mx(idn));                   % Medial peak X
 myn = mean(my(idn));                   % Medial peak Y
+% keyboard;             % For PTOA subject 014 year 1 visit left knee T1rho/T2*
 %
 % Get Trochlea Groove
 %
 idxmn = [round(mean(idp)); round(mean(idn))];
 idxmn = sort(idxmn);
 idmn = find(ids>idxmn(1)&ids<idxmn(2));
-idmn = ids(idmn(1:3));
+if any(abs(diff(mx(ids(idmn(1:3)))))>7)
+  idmn = ids(idmn(2:4));               % Trap for a "short" slice
+else
+  idmn = ids(idmn(1:3));
+end
 mxm = mean(mx(idmn));
 mym = mean(my(idmn));
 %

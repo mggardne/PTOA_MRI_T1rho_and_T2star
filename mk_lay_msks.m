@@ -1,5 +1,5 @@
-function [maskf,maskt,ibone,f,t,f3,t3] = mk_lay_msks(brois,rsl,nrsl, ...
-                                            iszs,dist,scal,v,fps,sn,leg)
+function [maskf,maskt,ibone,f,t,f3,t3,maskb,bsl,b,b3] = mk_lay_msks( ...
+                             brois,rsl,nrsl,iszs,dist,scal,v,fps,sn,leg)
 %MK_LAY_MSKS  Takes the PTOA knee sagittal segmentations for the femur
 %          and tibia and creates image masks for deep and superficial
 %          cartilage layers.
@@ -39,6 +39,19 @@ function [maskf,maskt,ibone,f,t,f3,t3] = mk_lay_msks(brois,rsl,nrsl, ...
 %          is the cartilage segmentation, and the second row is the
 %          bone segmentations.  The columns are the slices in RSL.
 %
+%          [MASKF,MASKT,IBONE,F,T,F3,T3,MASKB,BSL,B,B3] = MK_LAY_MSKS(
+%          BROIS,RSL,NRSL,ISZS) If the structure, BROIS, contains
+%          segmentations of bloom artifacts, returns the two-dimensional
+%          bloom mask, MASKB. The first column in the logical masks for
+%          the image, the second column is the slices in RSL.  The cell
+%          arrays, B, and B3, contain the two-dimensional bloom (B) and
+%          three-dimensional bloom (B3) segmentations.  The columns are
+%          the slices in BSL.
+%
+%          If the structure, BROIS, does not contain bloom artifact
+%          segmentations, the returned bloom mask, MASKB, is a logical
+%          true array.  The returned BSL, B, and B3 are empty arrays.
+%
 %          [MASKF,MASKT] = MK_LAY_MSKS(BROIS,RSL,NRSL,ISZS,DIST,SCAL,
 %          V,FPS,SN,LEG) Given the image matrix (third dimension is
 %          the slices), V, text for the start of the output file names,
@@ -67,6 +80,10 @@ function [maskf,maskt,ibone,f,t,f3,t3] = mk_lay_msks(brois,rsl,nrsl, ...
 %
 %          08-Aug-2025 * Mack Gardner-Morse * Checks for trochlea in
 %                                             input BROIS variable.
+%
+%          04-Jun-2026 * Mack Gardner-Morse * Incorporated bloom
+%                                             artifact segmentations to
+%                                             create bloom masks.
 %
 
 %#######################################################################
@@ -127,10 +144,25 @@ if iplt
   cmap = [gmap; jmap];
 %
   lt = ['g.-'; 'b.-'; 'c.-'; 'r.-'; 'y.-'; 'm.-'];    % Line color and type
-  legds = ['FEM_CART'; 'FEM_BONE'; 'TIB_CART'; 'TIB_BONE'];
+  legds = ['FEM_CART'; 'FEM_BONE'; 'TIB_CART'; 'TIB_BONE'; 'BLOOM   '];
 end
 %
-% Initialize Arrays
+% Initialize ROI Coordinate Arrays
+%
+npxt = prod(iszs);                     % Total number of pixels in a slice
+%
+if size(brois,2)>2
+  ibloom = true;
+  bsl = brois(3).rois.slice;           % Slices with bloom (not unique)
+  nb = size(bsl,1);     % Number of blooms
+  b = cell(1,nb);       % 2D bloom coordinates
+  b3 = cell(1,nb);      % 3D bloom coordinates
+else
+  ibloom = false;
+  bsl = [];
+  b = [];
+  b3 = [];
+end
 %
 if size(brois(1).rois(1).roi,2)<3
   itroch = false;       % No trochlear segmentations
@@ -138,16 +170,16 @@ else
   itroch = true;        % Include trochlear segmentations
 end
 %
-f = cell(2,nrsl);       % 2D Femur coordinates (1 - cartilage, 2 - bone)
-t = cell(2,nrsl);       % 2D Tibia coordinates (1 - cartilage, 2 - bone)
+f = cell(2,nrsl);       % 2D femur coordinates (1 - cartilage, 2 - bone)
+t = cell(2,nrsl);       % 2D tibia coordinates (1 - cartilage, 2 - bone)
 %
 f3 = cell(2,nrsl);      % 3D femur coordinates (1 - cartilage, 2 - bone)
 t3 = cell(2,nrsl);      % 3D tibia coordinates (1 - cartilage, 2 - bone)
 %
 ibone = false(nrsl,2);                 % Bone exists? (columns:  1 - femur, 2 - tibia)
-npxt = prod(iszs);                     % Total number of pixels in a slice
 maskf = false(npxt,2,nrsl);            % Mask for femoral cartilage
 maskt = false(npxt,2,nrsl);            % Mask for tibial cartilage
+maskb = true(npxt,nrsl);               % Mask for bloom artifacts
 %
 % Loop through ROI Slices, Plot ROIs and Generate Masks for Each Slice
 %
@@ -171,55 +203,109 @@ for k = 1:nrsl          % Loop through all slices
            'FontWeight','bold');
      hold on;
 %
-     lh = gobjects(4,1);               % Line graphic handles
-     idl = false(4,1);
+     lh = gobjects(10,1);              % Line graphic handles - maximum of five blooms per slice
+     idl = false(5,1);                 % Index for legend entries
 %
    end
 %
 % Get ROI Data for this Slice and Plot ROIs
 %
-   for lb = 1:2         % Loop through bones - femur = 1 and tibia = 2
-      for lc = 1:2      % Loop through surfaces - cartilage = 1 and bone = 2
+   if ibloom
+     nbone = 3;
+   else
+     nbone = 2;
+   end
+%
+   for lb = 1:nbone     % Loop through bones - femur = 1, tibia = 2, and bloom = 3
+      if lb>2
+        nsurf = 1;
+      else
+        nsurf = 2;
+      end
+      for lc = 1:nsurf  % Loop through surfaces - cartilage/bloom = 1 and bone = 2
          idxl = 2*lb+lc-2;
          idxr = brois(lb).rois(lc).slice==slk;
          if any(idxr)
            if lb==1&&itroch
              nc = 3;
+           elseif lb==3 % Bloom
+             nc = 1;
            else
              nc = 2;
            end
-           for n = 1:nc % Loop through compartments - lateral = 1, medial = 2 and trochlea = 3
+           for n = 1:nc % Loop through compartments - lateral/bloom = 1, medial = 2 and trochlea = 3
               idxs = brois(lb).rois(lc).roi(n).imageno==slk;
               if any(idxs)
-                dat = cell2mat( ...
-                               brois(lb).rois(lc).roi(n).data(idxs)');
-                dat = fix_gap(dat);
 %
-                dat3 = cell2mat( ...
+                if lb==3               % If bloom ROI
+%
+                  slb = find(idxs);    % Blooms on this slice
+                  bn = size(slb,2);    % Number of blooms on this slice
+%
+                  for isl = 1:bn
+%
+                     idsb = slb(isl);
+%
+                     dat = cell2mat( ...
+                                 brois(lb).rois(lc).roi(n).data(idsb)');
+                     dat = fix_gap(dat);
+%                    
+                     dat3 = cell2mat( ...
+                                brois(lb).rois(lc).roi(n).data3(idsb)');
+                     dat3 = fix_gap(dat3);
+%
+                     b{lc,idsb} = dat;           % Bloom
+                     b3{lc,idsb} = dat3;         % 3D bloom
+%
+                     if iplt
+                       lh(isl+4) = plot(dat(:,1),dat(:,2), ...
+                            lt(idxl,:),'LineWidth',0.25,'MarkerSize',2);
+                       idl(5) = true;
+                     end
+%
+% Create Bloom Artifact Mask
+%
+                     maskbm = ~poly2mask(dat(:,1),dat(:,2),iszs(1), ...
+                                         iszs(2));         % Bloom mask
+                     maskb(:,k) = maskb(:,k)&maskbm(:);    % As a vector
+%
+                  end   % End of for loop
+%
+                else    % Else not bloom ROI
+%
+                  dat = cell2mat(brois(lb).rois(lc).roi(n).data(idxs)');
+                  dat = fix_gap(dat);
+%
+                  dat3 = cell2mat( ...
                                 brois(lb).rois(lc).roi(n).data3(idxs)');
-                dat3 = fix_gap(dat3);
-                if lb==1
-                  f{lc,k} = dat;       % Femur
-                  f3{lc,k} = dat3;     % 3D femur
-                else
-                  t{lc,k} = dat;       % Tibia
-                  t3{lc,k} = dat3;     % 3D tibia
-                end
+                  dat3 = fix_gap(dat3);
 %
-                if iplt
-%                  lh(idxl) = plot(dat(:,1),dat(:,2),lt(idxl,:));
-                  lh(idxl) = plot(dat(:,1),dat(:,2),lt(idxl,:), ...
-                                  'LineWidth',0.25,'MarkerSize',2);
-                  idl(idxl) = true;
-                end
+                  if lb==1
+                    f{lc,k} = dat;     % Femur
+                    f3{lc,k} = dat3;   % 3D femur
+                  else
+                    t{lc,k} = dat;     % Tibia
+                    t3{lc,k} = dat3;   % 3D tibia
+                  end
 %
-              end
+                  if iplt
+%                    lh(idxl) = plot(dat(:,1),dat(:,2),lt(idxl,:));
+                    lh(idxl) = plot(dat(:,1),dat(:,2),lt(idxl,:), ...
+                                    'LineWidth',0.25,'MarkerSize',2);
+                    idl(idxl) = true;
+                  end
+%
+                end     % End of if bloom ROI
+%
+              end       % End of any idxs
+%
            end          % End of n loop - lateral/medial/trochlear loop
          end            % End of if - any rois for this slice
       end               % End of lc loop - cartilage/bone loop
       if lb==1
         ibone(k,lb) = all(~cellfun('isempty',f(:,k)));
-      else
+      end
+      if lb==2
         ibone(k,lb) = all(~cellfun('isempty',t(:,k)));
       end
    end                  % End of lb loop - femur/tibia loop
@@ -251,7 +337,9 @@ for k = 1:nrsl          % Loop through all slices
 %
    if iplt
      mask1 = maskf(:,1,k)|maskt(:,1,k);     % Superficial cartilage mask
+     mask1 = mask1&maskb(:,k);
      mask2 = maskf(:,2,k)|maskt(:,2,k);     % Deep cartilage mask
+     mask2 = mask2&maskb(:,k);
      cmx = max(img(:));
      img1 = img-cmx-1;
      dcmx = 16*cmx/128;

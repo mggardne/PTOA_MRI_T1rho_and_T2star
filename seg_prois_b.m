@@ -4,7 +4,7 @@
 %
 %          M-File which reads the registered MRI data and segmentation 
 %     CSV files to create masks for regions of interest in the femur
-%     and tibial compartments.  The masks are saved in MAT files with
+%     and tibial bones.  The masks are saved in MAT files with
 %     the series number and ending in "_prois.mat."
 %
 %     NOTES:  1.  The registered MRI MAT files must be in subject
@@ -31,7 +31,11 @@
 %             in the current directory or path.
 %
 %     15-Sep-2022 * Mack Gardner-Morse
+%
 %     26-Apr-2024 * Mack Gardner-Morse * Updated for baseline directory.
+%
+%     04-Jun-2026 * Mack Gardner-Morse * Added bloom artifact masks.
+%                                        See lines 170-179.
 %
 
 %#######################################################################
@@ -157,12 +161,22 @@ for m = 1:nmat
    [~,idbm] = intersect(rslb,idbm);    % Index for medial tibia bone slices
 %
 % Create Masks that Divide Cartilage into Deep and Superficial Layers
-% The first column in the logical masks is the mask for the image, the
-% second column is the cartilage layers (1 - superficial, and 2 - deep),
-% and the third column is the slices in RSL.
 %
-   [maskf,maskt,ibone,f,t,f3,t3] = mk_lay_msks(brois,rsl,nrsl,iszs, ...
-                                              dist,pspcs,v,fs,subj,leg);
+% The first column in the cartilage logical masks is the mask for the
+% image, the second column is the cartilage layers (1 - superficial,
+% and 2 - deep), and the third column is the slices in RSL.  The first
+% column in the logical mask for bloom artifact 
+%
+   [maskf,maskt,ibone,f,t,f3,t3,maskb] = mk_lay_msks(brois,rsl, ...
+                                    nrsl,iszs,dist,pspcs,v,fs,subj,leg);
+%
+% Combine Cartilage Layer Masks and Bloom Masks
+%
+   maskf(:,1,:) = squeeze(maskf(:,1,:))&maskb;
+   maskf(:,2,:) = squeeze(maskf(:,2,:))&maskb;
+%
+   maskt(:,1,:) = squeeze(maskt(:,1,:))&maskb;
+   maskt(:,2,:) = squeeze(maskt(:,2,:))&maskb;
 %
 % Get Femur Coordinate System from Fitted Cylinder
 %
@@ -294,6 +308,8 @@ end                     % End of m loop - MAT file loop
 %
 end                     % End of iskip if
 %
+% return                  % Skip T2* processing
+%
 % T2star
 %
 rdir = 'T2S';           % Directory for T2* segmentations
@@ -391,8 +407,16 @@ for m = 1:nmat
 % second column is the cartilage layers (1 - superficial, and 2 - deep),
 % and the third column is the slices in RSL.
 %
-   [maskf,maskt,ibone,f,t,f3,t3] = mk_lay_msks(brois,rsl,nrsl,iszs, ...
-                                              dist,pspcs,v,fs,subj,leg);
+   [maskf,maskt,ibone,f,t,f3,t3,maskb] = mk_lay_msks(brois,rsl,nrsl, ...
+                                         iszs,dist,pspcs,v,fs,subj,leg);
+%
+% Combine Cartilage Layer Masks and Bloom Masks
+%
+   maskf(:,1,:) = squeeze(maskf(:,1,:))&maskb;
+   maskf(:,2,:) = squeeze(maskf(:,2,:))&maskb;
+%
+   maskt(:,1,:) = squeeze(maskt(:,1,:))&maskb;
+   maskt(:,2,:) = squeeze(maskt(:,2,:))&maskb;
 %
 % Get Femur Coordinate System from Fitted Cylinder
 %
